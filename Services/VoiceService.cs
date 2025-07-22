@@ -109,6 +109,21 @@ public class VoiceService
             // Set the message channel
             SetMessageChannel(messageChannelId);
             
+            // Self-deafen the bot
+            try
+            {
+                var voiceStateProps = new VoiceStateProperties(guildId, voiceChannelId.Value)
+                {
+                    SelfDeaf = true
+                };
+                await client.UpdateVoiceStateAsync(voiceStateProps);
+                _logger.LogDebug("Bot self-deafened successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to self-deafen bot, continuing anyway");
+            }
+            
             _logger.LogInformation("Successfully joined voice channel: {ChannelId}", voiceChannelId.Value);
             return JoinedVoiceChannel;
         }
@@ -468,6 +483,21 @@ public class VoiceService
             // Update our tracking
             _voiceClient = newVoiceClient;
             _currentVoiceChannelId = newChannelId;
+
+            // Self-deafen the bot again
+            try
+            {
+                var voiceStateProps = new VoiceStateProperties(guildId, newChannelId)
+                {
+                    SelfDeaf = true
+                };
+                await _client.UpdateVoiceStateAsync(voiceStateProps);
+                _logger.LogDebug("Bot self-deafened successfully after recreation");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to self-deafen bot after recreation, continuing anyway");
+            }
 
             // Restart current track if one was playing
             if (_currentTrack != null)
