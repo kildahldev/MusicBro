@@ -6,7 +6,14 @@ No fancy features, just straightforward music playback, autoplaylists and queue 
 Features inspired by https://github.com/Just-Some-Bots/MusicBot
 
 ## Version History
-#### v1.4 (Latest)
+
+#### v1.5 (Latest)
+- Added .restart command for the bot
+- Bot now automatically leaves voice channels when inactive
+- Bot now automatically self-deafens when joining voice channels
+- Various bug fixes
+
+#### v1.4
 - Changed audio format from WAV to MP3 for storage space efficiency
 
 #### v1.3
