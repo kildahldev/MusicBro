@@ -86,7 +86,7 @@ services:
 
 ## Source Code
 
-Available (soon) at: https://github.com/kildahldev/musicbro
+Available at: https://github.com/kildahldev/musicbro
 
 ## License
 
