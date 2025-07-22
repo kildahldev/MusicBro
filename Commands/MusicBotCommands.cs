@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging;
 using MusicBro.Models;
 using MusicBro.Services;
+using MusicBro.Helpers;
 using Microsoft.Extensions.Configuration;
+using NetCord;
+using NetCord.Rest;
 using static MusicBro.Constants.Messages;
 
 namespace MusicBro.Commands;
@@ -24,26 +27,27 @@ public class MusicBotCommands
     }
 
     [Command("summon", "join")]
-    public async Task<string> SummonAsync(CommandContext context)
+    public async Task<bool> SummonAsync(CommandContext context)
     {
-        var result = await _voiceService.JoinVoiceChannelAsync(
-            context.Message.Author, 
+        var voiceChannelId = await VoiceHelper.GetUserVoiceChannelIdAsync(context);
+        if (voiceChannelId == null)
+        {
+            return false;
+        }
+
+        var success = await _voiceService.JoinVoiceChannelAsync(
+            voiceChannelId.Value,
             context.Message.GuildId!.Value, 
             context.Client, 
             context.Message.ChannelId).ConfigureAwait(false);
 
-        if (result == JoinedVoiceChannel)
+        if (success)
         {
-            // Start autoplaylist if queue is empty
-            if (!_queueManager.Queue.IsPlaying && _queueManager.Queue.Count == 0)
-            {
-                ThreadPool.QueueUserWorkItem(_ => {
-                    _queueManager.PlayNextAsync().Wait();
-                });
-            }
+            QueueHelper.StartAutoPlaylistIfEmpty(_queueManager);
+            return true;
         }
 
-        return result;
+        return false;
     }
     
     [Command("play", "p")]
@@ -64,46 +68,35 @@ public class MusicBotCommands
         if (_voiceService.VoiceClient == null)
         {
             _logger.LogDebug("Bot not in voice channel, attempting to join");
-            var joinResult = await _voiceService.JoinVoiceChannelAsync(
-                context.Message.Author, 
+            var userVoiceChannelId = await VoiceHelper.GetUserVoiceChannelIdAsync(context);
+            if (userVoiceChannelId == null)
+            {
+                return NotInVoiceChannel;
+            }
+
+            var joinSuccess = await _voiceService.JoinVoiceChannelAsync(
+                userVoiceChannelId.Value,
                 context.Message.GuildId!.Value, 
                 context.Client, 
                 context.Message.ChannelId);
-            if (joinResult != JoinedVoiceChannel)
+            if (!joinSuccess)
             {
-                _logger.LogDebug("Failed to join voice channel: {Result}", joinResult);
-                return joinResult;
+                _logger.LogDebug("Failed to join voice channel");
+                return FailedToJoinVoiceChannel;
             }
         }
         
         // Check if it's a playlist URL
-        if (query.Contains("playlist?list="))
+        if (PlaylistHelper.IsPlaylistUrl(query))
         {
-            _logger.LogDebug("Processing playlist for query: {Query}", query);
-            var playlistTracks = await _youtubeService.GetPlaylistTracksAsync(query, author.Username, author.Id.ToString());
-            if (playlistTracks.Count == 0)
-            {
-                _logger.LogDebug("No tracks found in playlist: {Query}", query);
-                return CouldNotProcessTrack;
-            }
-            
-            var wasEmpty = !_queueManager.Queue.IsPlaying && _queueManager.Queue.Count == 0;
-            
-            // Add all tracks to queue
-            foreach (var track in playlistTracks)
-            {
-                _queueManager.Queue.Enqueue(track);
-            }
-            
-            // Set message channel and start playing if queue was empty
-            _voiceService.SetMessageChannel(context.Message.ChannelId);
-            if (wasEmpty)
-            {
-                await _queueManager.PlayNextAsync();
-            }
-            
-            _logger.LogDebug("Playlist processing completed for query: {Query}", query);
-            return string.Format(PlaylistAdded, playlistTracks.Count);
+            return await PlaylistHelper.ProcessPlaylistAsync(
+                query, 
+                author, 
+                _logger,
+                _youtubeService,
+                _queueManager,
+                _voiceService,
+                context.Message.ChannelId);
         }
         
         // Single track handling
@@ -132,12 +125,12 @@ public class MusicBotCommands
     [Command("skip", "s")]
     public async Task<string> Skip(CommandContext context)
     {
-        var trackToSkip = _queueManager.Queue.CurrentTrack.Title;
         if (_queueManager.Queue.CurrentTrack == null)
         {
             return NothingPlaying;
         }
 
+        var trackToSkip = _queueManager.Queue.CurrentTrack.Title;
         await _queueManager.SkipAsync();
         return $"{context.Message.Author.GlobalName} skipped {trackToSkip}";
     }
@@ -369,6 +362,54 @@ public class MusicBotCommands
         }
     }
     
+    [Command("restart")]
+    public async Task<bool> Restart(CommandContext context)
+    {
+        try
+        {
+            // Store voice channel info before restart
+            var wasInVoiceChannel = _voiceService.VoiceClient != null;
+            var guildId = _voiceService.CurrentGuildId;
+            var voiceChannelId = _voiceService.CurrentVoiceChannelId;
+            
+            // Stop current playback first
+            _voiceService.StopPlayback();
+            _queueManager.Queue.IsPlaying = false;
+            await _voiceService.CleanupCurrentMessageAsync();
+            
+            // Send restart message
+            var channel = await context.Client.Rest.GetChannelAsync(context.Message.ChannelId);
+            if (channel is TextChannel textChannel)
+            {
+                await textChannel.SendMessageAsync(new MessageProperties { Content = RestartingBot });
+            }
+
+            // Disconnect and reconnect the gateway client
+            await context.Client.CloseAsync();
+            await Task.Delay(2000); // Wait 2 seconds before reconnecting
+            await context.Client.StartAsync();
+
+            // Rejoin voice channel if we were in one before restart
+            if (wasInVoiceChannel && guildId.HasValue && voiceChannelId.HasValue)
+            {
+                await Task.Delay(1000); // Give the client time to fully reconnect
+                await _voiceService.JoinVoiceChannelAsync(
+                    voiceChannelId.Value,
+                    guildId.Value,
+                    context.Client,
+                    context.Message.ChannelId);
+                QueueHelper.StartAutoPlaylistIfEmpty(_queueManager);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to restart bot");
+            return false;
+        }
+    }
+    
     [Command("help")]
     public Task<string> Help(CommandContext context)
     {
@@ -386,6 +427,7 @@ public class MusicBotCommands
                          string.Format(HelpPause, prefix) + 
                          string.Format(HelpResume, prefix) + 
                          string.Format(HelpAutoPlaylist, prefix) + 
+                         string.Format(HelpRestart, prefix) + 
                          string.Format(HelpHelp, prefix);
         
         return Task.FromResult(helpMessage);

@@ -5,7 +5,6 @@ public static class Constants
     public static class Messages
     {
         public const string NotInVoiceChannel = "You need to be in a voice channel";
-        public const string JoinedVoiceChannel = "Joined voice channel!";
         public const string FailedToJoinVoiceChannel = "Failed to join voice channel";
         public const string ProvideQuery = "Please provide a YouTube URL or search term";
         public const string CouldNotProcessTrack = "Could not find or process the track";
@@ -14,7 +13,6 @@ public static class Constants
         public const string AddedToFrontOfQueue = "Added to front of queue: {0}";
         public const string QueueEmpty = "Queue is empty";
         public const string QueueHeader = "**Queue:**\n";
-        public const string NowPlaying = "**Now Playing:** {0} (requested by {1})\n\n";
         public const string NowPlayingWithProgress = "**Now Playing:** {0} (requested by {1}) `{2} / {3}`";
         public const string UpNext = "**Up Next:**\n";
         public const string QueueItem = "{0}. {1} (requested by {2})\n";
@@ -42,6 +40,7 @@ public static class Constants
         public const string HelpPause = "**{0}pause** - Pause playback\n";
         public const string HelpResume = "**{0}resume** - Resume playback\n";
         public const string HelpAutoPlaylist = "**{0}autoplaylist** / **{0}ap** `list|get <name>|set <name>|add <name> <url>|edit <name> [url]` - Manage autoplaylists\n";
+        public const string HelpRestart = "**{0}restart** - Restart the bot (disconnect and reconnect)\n";
         public const string HelpHelp = "**{0}help** - Show this help message";
 
         public const string AutoPlaylistGetUsage = "Usage: `autoplaylist get <name>`";
@@ -63,6 +62,9 @@ public static class Constants
         public const string ButtonPlay = "Resume";
         public const string ButtonSkip = "Skip";
         public const string SkippedBy = "{0} skipped by {1}";
+        
+        // Restart messages
+        public const string RestartingBot = "Restarting bot...";
         
     }
 }

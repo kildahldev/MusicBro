@@ -47,6 +47,8 @@ public class VoiceService
 
     public VoiceClient? VoiceClient => _voiceClient;
     public bool IsPaused => _isPaused;
+    public ulong? CurrentVoiceChannelId => _currentVoiceChannelId;
+    public ulong? CurrentGuildId => _currentGuildId;
 
     public void SetVoiceClient(VoiceClient voiceClient, ulong guildId, ulong voiceChannelId)
     {
@@ -82,29 +84,19 @@ public class VoiceService
         }
     }
 
-    public async Task<string> JoinVoiceChannelAsync(User author, ulong guildId, GatewayClient client, ulong messageChannelId)
+    public async Task<bool> JoinVoiceChannelAsync(ulong voiceChannelId, ulong guildId, GatewayClient client, ulong messageChannelId)
     {
-        _logger.LogDebug("Starting voice channel join for user: {UserId}", author.Id);
-        
-        var guild = await client.Rest.GetGuildAsync(guildId);
-        var voiceState = await guild.GetUserVoiceStateAsync(author.Id);
-        var voiceChannelId = voiceState.ChannelId;
-
-        if (voiceChannelId == null)
-        {
-            _logger.LogDebug("User not in voice channel, cannot join");
-            return NotInVoiceChannel;
-        }
+        _logger.LogDebug("Starting voice channel join for channel: {ChannelId}", voiceChannelId);
 
         try
         {
-            _logger.LogDebug("Attempting to join voice channel: {ChannelId}", voiceChannelId.Value);
+            _logger.LogDebug("Attempting to join voice channel: {ChannelId}", voiceChannelId);
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-            var voiceClient = await client.JoinVoiceChannelAsync(guildId, voiceChannelId.Value);
+            var voiceClient = await client.JoinVoiceChannelAsync(guildId, voiceChannelId);
             _logger.LogDebug("Voice client created, starting connection");
             await voiceClient.StartAsync(cts.Token);
             
-            SetVoiceClient(voiceClient, guildId, voiceChannelId.Value);
+            SetVoiceClient(voiceClient, guildId, voiceChannelId);
             
             // Set the message channel
             SetMessageChannel(messageChannelId);
@@ -112,7 +104,7 @@ public class VoiceService
             // Self-deafen the bot
             try
             {
-                var voiceStateProps = new VoiceStateProperties(guildId, voiceChannelId.Value)
+                var voiceStateProps = new VoiceStateProperties(guildId, voiceChannelId)
                 {
                     SelfDeaf = true
                 };
@@ -124,13 +116,13 @@ public class VoiceService
                 _logger.LogWarning(ex, "Failed to self-deafen bot, continuing anyway");
             }
             
-            _logger.LogInformation("Successfully joined voice channel: {ChannelId}", voiceChannelId.Value);
-            return JoinedVoiceChannel;
+            _logger.LogInformation("Successfully joined voice channel: {ChannelId}", voiceChannelId);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to join voice channel");
-            return FailedToJoinVoiceChannel;
+            return false;
         }
     }
 
@@ -546,6 +538,42 @@ public class VoiceService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during voice client cleanup");
+        }
+    }
+    
+    public async Task LeaveVoiceChannelAsync()
+    {
+        try
+        {
+            StopPlayback();
+            await CleanupCurrentMessageAsync();
+            
+            if (_voiceClient != null)
+            {
+                await _voiceClient.CloseAsync();
+            }
+            
+            // Update voice state to tell Discord we're leaving
+            if (_currentGuildId.HasValue)
+            {
+                try
+                {
+                    var voiceStateProps = new VoiceStateProperties(_currentGuildId.Value, null);
+                    await _client.UpdateVoiceStateAsync(voiceStateProps);
+                    _logger.LogDebug("Updated voice state to disconnect from voice channel");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to update voice state when leaving, but continuing with cleanup");
+                }
+            }
+            
+            await CleanupVoiceClientAsync();
+            _logger.LogInformation("Successfully left voice channel");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error leaving voice channel");
         }
     }
     

@@ -78,14 +78,24 @@ public class MusicBotService : BackgroundService
             try
             {
                 var context = new CommandContext { Message = message, Client = _client };
-                var result = await (Task<string>)commandInfo.method.Invoke(commandInfo.instance, new object[] { context })!;
-                if (result != null)
+                var invokeResult = commandInfo.method.Invoke(commandInfo.instance, new object[] { context })!;
+                
+                // Handle different return types
+                if (invokeResult is Task<string> stringTask)
                 {
-                    var channel = await _client.Rest.GetChannelAsync(message.ChannelId);
-                    if (channel is TextChannel textChannel)
+                    var result = await stringTask;
+                    if (!string.IsNullOrEmpty(result))
                     {
-                        await textChannel.SendMessageAsync(result);
+                        var channel = await _client.Rest.GetChannelAsync(message.ChannelId);
+                        if (channel is TextChannel textChannel)
+                        {
+                            await textChannel.SendMessageAsync(result);
+                        }
                     }
+                }
+                else if (invokeResult is Task<bool> boolTask)
+                {
+                    await boolTask; // Just wait for completion, don't send message
                 }
 
             }

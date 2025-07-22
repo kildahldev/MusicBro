@@ -22,14 +22,15 @@ builder.Services
     .AddDiscordGateway(options =>
     {
         options.Token = Environment.GetEnvironmentVariable("DISCORD_TOKEN");
-        options.Intents = GatewayIntents.GuildMessages | GatewayIntents.DirectMessages | GatewayIntents.MessageContent | GatewayIntents.GuildVoiceStates;
+        options.Intents = GatewayIntents.GuildMessages | GatewayIntents.DirectMessages | GatewayIntents.MessageContent | GatewayIntents.GuildVoiceStates | GatewayIntents.GuildUsers;
     })
     .AddSingleton<VoiceService>()
     .AddSingleton<QueueManager>()
     .AddSingleton<YouTubeService>()
     .AddSingleton<DownloadService>()
     .AddSingleton<AutoPlaylistService>()
-    .AddHostedService<MusicBotService>();
+    .AddHostedService<MusicBotService>()
+    .AddHostedService<AutoLeaveService>();
 
 var host = builder.Build();
 
