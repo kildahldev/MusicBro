@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net9.0</TargetFramework>
+        <RootNamespace>MusicBro</RootNamespace>
+        <AssemblyName>MusicBro</AssemblyName>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.7" />
+      <PackageReference Include="NetCord" Version="1.0.0-alpha.393" />
+      <PackageReference Include="NetCord.Hosting" Version="1.0.0-alpha.393" />
+      <PackageReference Include="NetCord.Hosting.Services" Version="1.0.0-alpha.393" />
+      <PackageReference Include="NetCord.Services" Version="1.0.0-alpha.393" />
+      <PackageReference Include="System.Linq.Async" Version="6.0.3" />
+      <PackageReference Include="YoutubeExplode" Version="6.4.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="appsettings.json">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="tools\yt-dlp">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="tools\ffmpeg">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
+</Project>
