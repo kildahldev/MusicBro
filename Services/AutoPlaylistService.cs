@@ -26,8 +26,27 @@ public class AutoPlaylistService
         }
     }
 
+    private static bool IsValidPlaylistName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        
+        // Check for directory traversal attempts
+        if (name.Contains("..") || name.Contains("/") || name.Contains("\\")) return false;
+        
+        // Check for other dangerous characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+        if (name.Any(c => invalidChars.Contains(c))) return false;
+        
+        // Reasonable length limit
+        if (name.Length > 100) return false;
+        
+        return true;
+    }
+
     private string? FindActualPlaylistName(string name)
     {
+        if (!IsValidPlaylistName(name)) return null;
+        
         try
         {
             var playlistFiles = Directory.GetFiles(_playlistsPath, "*.txt");
@@ -105,6 +124,12 @@ public class AutoPlaylistService
 
     public Task<string?> GetPlaylistPathAsync(string name)
     {
+        if (!IsValidPlaylistName(name))
+        {
+            _logger.LogWarning("Invalid playlist name provided for path lookup: {Name}", name);
+            return Task.FromResult<string?>(null);
+        }
+        
         try
         {
             var playlistFiles = Directory.GetFiles(_playlistsPath, "*.txt");
@@ -122,9 +147,15 @@ public class AutoPlaylistService
 
     public async Task<bool> SetPlaylistAsync(string name, string? playlistUrl = null)
     {
+        if (!IsValidPlaylistName(name))
+        {
+            _logger.LogWarning("Invalid playlist name provided: {Name}", name);
+            return false;
+        }
+        
         try
         {
-            // Use actual filename case if exists, otherwise use provided name
+            // Use actual filename case if exists, otherwise use provided name (already validated)
             var actualName = FindActualPlaylistName(name) ?? name;
             var playlistPath = Path.Combine(_playlistsPath, $"{actualName}.txt");
             var existed = File.Exists(playlistPath);

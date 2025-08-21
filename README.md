@@ -14,6 +14,7 @@ Features inspired by Just-Some-Bots/MusicBot
 - Added `.ap delete` command to remove autoplaylists
 - All autoplaylist commands now work case-insensitively
 - Fixed cases where autoplaylist wouldn't start again after bot auto-leaving
+- Added input validation for autoplaylist commands
 
 #### v1.5
 - Added .restart command for the bot
