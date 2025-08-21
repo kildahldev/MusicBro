@@ -231,6 +231,10 @@ public class AutoLeaveService : BackgroundService
         try
         {
             await _voiceService.LeaveVoiceChannelAsync();
+            
+            // Reset queue state when auto-leaving
+            _queueManager.Queue.IsPlaying = false;
+            
             _logger.LogInformation("Bot left voice channel due to inactivity");
         }
         catch (Exception ex)

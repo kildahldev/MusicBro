@@ -3,11 +3,19 @@
 A simple selfhosted Discord music bot built with C# and .NET 9.0 that plays music from YouTube.
 No fancy features, just straightforward music playback, autoplaylists and queue system.
 
-Features inspired by https://github.com/Just-Some-Bots/MusicBot
+Features inspired by Just-Some-Bots/MusicBot
 
 ## Version History
 
-#### v1.5 (Latest)
+#### v1.6 (Latest)
+- Commands now provide immediate feedback when requesting a song, doesn't wait for download to finish anymore
+- When adding playlist URLs, all individual tracks are now properly saved to file
+- `.ap get` command now sends autoplaylist files as Discord attachments
+- Added `.ap delete` command to remove autoplaylists
+- All autoplaylist commands now work case-insensitively
+- Fixed cases where autoplaylist wouldn't start again after bot auto-leaving
+
+#### v1.5
 - Added .restart command for the bot
 - Bot now automatically leaves voice channels when inactive
 - Bot now automatically self-deafens when joining voice channels
@@ -81,7 +89,7 @@ services:
 - `.shuffle` - Shuffle the queue
 - `.pause` - Pause playback
 - `.resume` - Resume playback
-- `.autoplaylist` / `.ap` - Manage autoplaylists (list|get|set|add|edit)
+- `.autoplaylist` / `.ap` - Manage autoplaylists (list|get|set|add|edit|delete)
 - `.help` - Show help message
 
 ## Source Code

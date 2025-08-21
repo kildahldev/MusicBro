@@ -26,6 +26,28 @@ public class MusicBotCommands
         _autoPlaylistService = autoPlaylistService;
     }
 
+    private async Task<Track?> GetTrackWithBackgroundDownloadAsync(string query, string requestedBy, string requestedById)
+    {
+        // Get metadata quickly for instant feedback
+        var track = await _youtubeService.GetTrackMetadataAsync(query, requestedBy, requestedById);
+        if (track == null) return null;
+        
+        // Trigger background download
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _youtubeService.DownloadTrackAsync(track);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Background download failed for track: {Title}", track.Title);
+            }
+        });
+        
+        return track;
+    }
+
     [Command("summon", "join")]
     public async Task<bool> SummonAsync(CommandContext context)
     {
@@ -99,9 +121,9 @@ public class MusicBotCommands
                 context.Message.ChannelId);
         }
         
-        // Single track handling
+        // Single track handling - get metadata quickly for instant feedback
         _logger.LogDebug("Processing single track for query: {Query}", query);
-        var singleTrack = await _youtubeService.GetCompleteTrackAsync(query, author.Username, author.Id.ToString());
+        var singleTrack = await GetTrackWithBackgroundDownloadAsync(query, author.Username, author.Id.ToString());
         if (singleTrack == null)
         {
             _logger.LogDebug("Failed to get track for query: {Query}", query);
@@ -147,7 +169,7 @@ public class MusicBotCommands
         var query = parts[1].Trim();
         var author = context.Message.Author;
         
-        var track = await _youtubeService.GetCompleteTrackAsync(query, author.Username, author.Id.ToString());
+        var track = await GetTrackWithBackgroundDownloadAsync(query, author.Username, author.Id.ToString());
         if (track == null)
         {
             return CouldNotProcessTrack;
@@ -201,7 +223,7 @@ public class MusicBotCommands
         var query = parts[1].Trim();
         var author = context.Message.Author;
         
-        var track = await _youtubeService.GetCompleteTrackAsync(query, author.Username, author.Id.ToString());
+        var track = await GetTrackWithBackgroundDownloadAsync(query, author.Username, author.Id.ToString());
         if (track == null)
         {
             return CouldNotProcessTrack;
@@ -267,6 +289,7 @@ public class MusicBotCommands
     [Command("autoplaylist", "ap")]
     public async Task<string> AutoPlaylist(CommandContext context)
     {
+        var prefix = Environment.GetEnvironmentVariable("DISCORD_PREFIX") ?? ".";
         var parts = context.Message.Content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
         {
@@ -309,7 +332,18 @@ public class MusicBotCommands
                 try
                 {
                     var fileName = $"{parts[2]}.txt";
-                    return string.Format(AutoPlaylistGetSuccess, parts[2], fileName);
+                    var fileBytes = await File.ReadAllBytesAsync(playlistPath);
+                    
+                    var channel = await context.Client.Rest.GetChannelAsync(context.Message.ChannelId);
+                    if (channel is TextChannel textChannel)
+                    {
+                        await textChannel.SendMessageAsync(new MessageProperties 
+                        { 
+                            Content = string.Format(AutoPlaylistGetSuccess, parts[2], fileName)
+                        }.AddAttachments(new AttachmentProperties(fileName, new MemoryStream(fileBytes))));
+                    }
+                    
+                    return string.Empty;
                 }
                 catch (Exception ex)
                 {
@@ -357,8 +391,19 @@ public class MusicBotCommands
                 
                 return string.Format(AutoPlaylistUpdated, parts[2]);
                 
+            case "delete":
+                if (parts.Length < 3)
+                {
+                    return AutoPlaylistDeleteUsage;
+                }
+                
+                var deleteSuccess = await _autoPlaylistService.DeletePlaylistAsync(parts[2]);
+                return deleteSuccess 
+                    ? string.Format(AutoPlaylistDeleted, parts[2])
+                    : string.Format(AutoPlaylistNotFound, parts[2]);
+                
             default:
-                return HelpAutoPlaylist;
+                return  string.Format(HelpAutoPlaylist, prefix);
         }
     }
     

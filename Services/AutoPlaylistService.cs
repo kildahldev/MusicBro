@@ -1,17 +1,20 @@
 using Microsoft.Extensions.Logging;
+using MusicBro.Helpers;
 
 namespace MusicBro.Services;
 
 public class AutoPlaylistService
 {
     private readonly ILogger<AutoPlaylistService> _logger;
+    private readonly YouTubeService _youtubeService;
     private readonly string _playlistsPath;
     private readonly string _activePlaylistConfigPath;
     private readonly Random _random = new();
 
-    public AutoPlaylistService(ILogger<AutoPlaylistService> logger)
+    public AutoPlaylistService(ILogger<AutoPlaylistService> logger, YouTubeService youtubeService)
     {
         _logger = logger;
+        _youtubeService = youtubeService;
         _playlistsPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "autoplaylists");
         _activePlaylistConfigPath = Path.Combine(_playlistsPath, "activeplaylist.config");
         
@@ -20,6 +23,21 @@ public class AutoPlaylistService
         {
             Directory.CreateDirectory(_playlistsPath);
             _logger.LogInformation("Created autoplaylists directory: {PlaylistsPath}", _playlistsPath);
+        }
+    }
+
+    private string? FindActualPlaylistName(string name)
+    {
+        try
+        {
+            var playlistFiles = Directory.GetFiles(_playlistsPath, "*.txt");
+            var actualFile = playlistFiles.FirstOrDefault(f => 
+                Path.GetFileNameWithoutExtension(f).Equals(name, StringComparison.OrdinalIgnoreCase));
+            return actualFile != null ? Path.GetFileNameWithoutExtension(actualFile) : null;
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -89,8 +107,11 @@ public class AutoPlaylistService
     {
         try
         {
-            var playlistPath = Path.Combine(_playlistsPath, $"{name}.txt");
-            return Task.FromResult(File.Exists(playlistPath) ? playlistPath : null);
+            var playlistFiles = Directory.GetFiles(_playlistsPath, "*.txt");
+            var actualFile = playlistFiles.FirstOrDefault(f => 
+                Path.GetFileNameWithoutExtension(f).Equals(name, StringComparison.OrdinalIgnoreCase));
+            
+            return Task.FromResult(actualFile);
         }
         catch (Exception ex)
         {
@@ -103,13 +124,37 @@ public class AutoPlaylistService
     {
         try
         {
-            var playlistPath = Path.Combine(_playlistsPath, $"{name}.txt");
+            // Use actual filename case if exists, otherwise use provided name
+            var actualName = FindActualPlaylistName(name) ?? name;
+            var playlistPath = Path.Combine(_playlistsPath, $"{actualName}.txt");
             var existed = File.Exists(playlistPath);
             
             if (playlistUrl != null)
             {
-                // Write the playlist URL to the file
-                await File.WriteAllTextAsync(playlistPath, playlistUrl);
+                // Check if it's a playlist URL
+                if (PlaylistHelper.IsPlaylistUrl(playlistUrl))
+                {
+                    // Fetch all tracks from the playlist and write their URLs to the file
+                    _logger.LogInformation("Fetching tracks from playlist: {PlaylistUrl}", playlistUrl);
+                    var playlistTracks = await _youtubeService.GetPlaylistTracksAsync(playlistUrl, "AutoPlaylist", "autoplaylist");
+                    
+                    if (playlistTracks.Count > 0)
+                    {
+                        var trackUrls = playlistTracks.Where(t => !string.IsNullOrEmpty(t.Url)).Select(t => t.Url).ToList();
+                        await File.WriteAllLinesAsync(playlistPath, trackUrls);
+                        _logger.LogInformation("Saved {TrackCount} tracks to autoplaylist {Name}", trackUrls.Count, name);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No tracks found in playlist: {PlaylistUrl}", playlistUrl);
+                        await File.WriteAllTextAsync(playlistPath, "");
+                    }
+                }
+                else
+                {
+                    // Single track URL or other content
+                    await File.WriteAllTextAsync(playlistPath, playlistUrl);
+                }
             }
             else
             {
@@ -120,7 +165,7 @@ public class AutoPlaylistService
                 }
             }
             
-            _logger.LogInformation("Playlist {Name} {Action}", name, existed ? "updated" : "created");
+            _logger.LogInformation("Playlist {Name} {Action}", actualName, existed ? "updated" : "created");
             return existed;
         }
         catch (Exception ex)
@@ -152,19 +197,53 @@ public class AutoPlaylistService
     {
         try
         {
-            var playlistPath = Path.Combine(_playlistsPath, $"{name}.txt");
-            if (!File.Exists(playlistPath))
+            var actualName = FindActualPlaylistName(name);
+            if (actualName == null)
             {
                 return false;
             }
             
-            await File.WriteAllTextAsync(_activePlaylistConfigPath, name);
-            _logger.LogInformation("Active playlist set to: {Name}", name);
+            await File.WriteAllTextAsync(_activePlaylistConfigPath, actualName);
+            _logger.LogInformation("Active playlist set to: {Name}", actualName);
             return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting active playlist to {Name}", name);
+            return false;
+        }
+    }
+
+    public async Task<bool> DeletePlaylistAsync(string name)
+    {
+        try
+        {
+            var actualName = FindActualPlaylistName(name);
+            if (actualName == null)
+            {
+                return false;
+            }
+            
+            var playlistPath = Path.Combine(_playlistsPath, $"{actualName}.txt");
+
+            // Check if this is the active playlist and clear it if so
+            var activePlaylist = await GetActivePlaylistAsync();
+            if (activePlaylist?.Equals(actualName, StringComparison.OrdinalIgnoreCase) == true)
+            {
+                if (File.Exists(_activePlaylistConfigPath))
+                {
+                    File.Delete(_activePlaylistConfigPath);
+                    _logger.LogInformation("Cleared active playlist as {Name} was deleted", actualName);
+                }
+            }
+
+            File.Delete(playlistPath);
+            _logger.LogInformation("Deleted playlist: {Name}", actualName);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting playlist {Name}", name);
             return false;
         }
     }

@@ -39,7 +39,7 @@ public static class Constants
         public const string HelpShuffle = "**{0}shuffle** - Shuffle the queue\n";
         public const string HelpPause = "**{0}pause** - Pause playback\n";
         public const string HelpResume = "**{0}resume** - Resume playback\n";
-        public const string HelpAutoPlaylist = "**{0}autoplaylist** / **{0}ap** `list|get <name>|set <name>|add <name> <url>|edit <name> [url]` - Manage autoplaylists\n";
+        public const string HelpAutoPlaylist = "**{0}autoplaylist** / **{0}ap** `list|get <name>|set <name>|add <name> <url>|edit <name> [url]|delete <name>` - Manage autoplaylists\n";
         public const string HelpRestart = "**{0}restart** - Restart the bot (disconnect and reconnect)\n";
         public const string HelpHelp = "**{0}help** - Show this help message";
 
@@ -47,6 +47,7 @@ public static class Constants
         public const string AutoPlaylistSetUsage = "Usage: `autoplaylist set <name>`";
         public const string AutoPlaylistAddUsage = "Usage: `autoplaylist add <name> <url>`";
         public const string AutoPlaylistEditUsage = "Usage: `autoplaylist edit <name> [url]`";
+        public const string AutoPlaylistDeleteUsage = "Usage: `autoplaylist delete <name>`";
         public const string NoAutoPlaylistsFound = "No autoplaylists found";
         public const string AutoPlaylistListHeader = "**Available autoplaylists:**\n";
         public const string AutoPlaylistListItem = "• {0}\n";
@@ -56,6 +57,7 @@ public static class Constants
         public const string AutoPlaylistUpdated = "Autoplaylist '{0}' updated";
         public const string AutoPlaylistCreated = "Autoplaylist '{0}' created";
         public const string AutoPlaylistActivated = "Active autoplaylist set to '{0}'";
+        public const string AutoPlaylistDeleted = "Autoplaylist '{0}' deleted";
         
         // Button labels and messages
         public const string ButtonPause = "Pause";

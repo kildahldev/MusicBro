@@ -81,40 +81,61 @@ public class YouTubeService
         };
     }
 
+    public async Task<Track?> GetTrackMetadataAsync(string query, string requestedBy, string requestedById)
+    {
+        _logger.LogDebug("Starting GetTrackMetadataAsync for query: {Query}", query);
+        
+        // Search YouTube for the track metadata only
+        var track = await SearchAndCreateTrackAsync(query, requestedBy, requestedById);
+        if (track == null)
+        {
+            _logger.LogDebug("GetTrackMetadataAsync failed - no track found for query: {Query}", query);
+            return null;
+        }
+        
+        _logger.LogDebug("GetTrackMetadataAsync completed for query: {Query}", query);
+        return track;
+    }
+
     public async Task<Track?> GetCompleteTrackAsync(string query, string requestedBy, string requestedById)
     {
         _logger.LogDebug("Starting GetCompleteTrackAsync for query: {Query}", query);
         
-        // Search YouTube for the track
-        var track = await SearchAndCreateTrackAsync(query, requestedBy, requestedById);
+        // Get metadata first
+        var track = await GetTrackMetadataAsync(query, requestedBy, requestedById);
         if (track == null)
         {
-            _logger.LogDebug("GetCompleteTrackAsync failed - no track found for query: {Query}", query);
             return null;
         }
         
-        // Only download if not already downloaded
+        // Then download
+        await DownloadTrackAsync(track);
         if (string.IsNullOrEmpty(track.LocalFilePath))
         {
-            _logger.LogDebug("Starting audio download for track: {Title}", track.Title);
-            // Download the audio file using yt-dlp
-            var filePath = await _downloadService.DownloadAudioAsync(track.Url, track.Title);
-            if (filePath == null)
-            {
-                _logger.LogDebug("GetCompleteTrackAsync failed - download failed for track: {Title}", track.Title);
-                return null;
-            }
-            
-            track.LocalFilePath = filePath;
-            _logger.LogDebug("Audio download completed for track: {Title}", track.Title);
-        }
-        else
-        {
-            _logger.LogDebug("Using existing file for track: {Title}", track.Title);
+            _logger.LogDebug("GetCompleteTrackAsync failed - download failed for track: {Title}", track.Title);
+            return null;
         }
         
         _logger.LogDebug("GetCompleteTrackAsync completed for query: {Query}", query);
         return track;
+    }
+
+    public async Task DownloadTrackAsync(Track track)
+    {
+        if (string.IsNullOrEmpty(track.LocalFilePath))
+        {
+            _logger.LogDebug("Starting background audio download for track: {Title}", track.Title);
+            var filePath = await _downloadService.DownloadAudioAsync(track.Url, track.Title);
+            if (filePath != null)
+            {
+                track.LocalFilePath = filePath;
+                _logger.LogDebug("Background audio download completed for track: {Title}", track.Title);
+            }
+            else
+            {
+                _logger.LogWarning("Background audio download failed for track: {Title}", track.Title);
+            }
+        }
     }
 
     private bool IsYouTubeUrl(string query)
