@@ -40,9 +40,11 @@ COPY --from=publish /app/publish .
 # Create directories for tools and data
 RUN mkdir -p /app/tools /app/autoplaylists /app/downloads
 
+# Create empty cookies.txt file that can be mounted
+RUN touch /app/cookies.txt
+
 # Copy tools directory if it exists in build context
 COPY tools/ /app/tools/
-COPY autoplaylists/ /app/autoplaylists/
 
 # Make sure ffmpeg and yt-dlp are executable
 RUN chmod +x /app/tools/ffmpeg /app/tools/yt-dlp || true
@@ -50,6 +52,8 @@ RUN chmod +x /app/tools/ffmpeg /app/tools/yt-dlp || true
 # Create a non-root user
 RUN addgroup -g 1000 musicbot && adduser -u 1000 -G musicbot -s /bin/sh -D musicbot
 RUN chown -R musicbot:musicbot /app
+# Make cookies.txt writable by musicbot user
+RUN chmod 664 /app/cookies.txt
 USER musicbot
 
 ENTRYPOINT ["dotnet", "MusicBro.dll"]

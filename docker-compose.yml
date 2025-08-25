@@ -12,3 +12,4 @@ services:
     volumes:
       - /mnt/docker/musicbro/autoplaylists:/app/autoplaylists
       - /mnt/docker/musicbro/downloads:/app/downloads
+      - /mnt/docker/musicbro/cookies.txt:/app/cookies.txt

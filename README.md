@@ -7,7 +7,9 @@ Features inspired by Just-Some-Bots/MusicBot
 
 ## Version History
 
-#### v1.6 (Latest)
+#### v1.7 (Latest)
+- Added optional YouTube cookies.txt support, as YouTube can be harsh with 403s
+#### v1.6
 - Commands now provide immediate feedback when requesting a song, doesn't wait for download to finish anymore
 - When adding playlist URLs, all individual tracks are now properly saved to file
 - `.ap get` command now sends autoplaylist files as Discord attachments
@@ -51,6 +53,7 @@ docker run -d \
   -e DISCORD_PREFIX=. \
   -v /mnt/docker/musicbro/autoplaylists:/app/autoplaylists \
   -v /mnt/docker/musicbro/downloads:/app/downloads \
+  -v /mnt/docker/musicbro/cookies.txt:/app/cookies.txt \
   kildahldev/musicbro:latest
 ```
 
@@ -70,7 +73,18 @@ services:
     volumes:
       - /mnt/docker/musicbro/autoplaylists:/app/autoplaylists
       - /mnt/docker/musicbro/downloads:/app/downloads
+      - /mnt/docker/musicbro/cookies.txt:/app/cookies.txt
 ```
+
+## YouTube Cookies (Optional)
+
+To avoid YouTube 403 errors and access age-restricted content, you can provide a cookies.txt file:
+
+1. Export your YouTube cookies to a file named `cookies.txt` (use browser extensions like "Get cookies.txt")
+2. Place it at `/mnt/docker/musicbro/cookies.txt` on your host system
+3. The bot will automatically use it if the file exists and contains data
+
+**Note:** The cookies.txt file is optional. The bot works fine without it for most content.
 
 ## Environment Variables
 

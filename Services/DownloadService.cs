@@ -8,11 +8,13 @@ public class DownloadService
 {
     private readonly ILogger<DownloadService> _logger;
     private readonly string _ytDlpPath;
+    private readonly string _cookiesPath;
 
     public DownloadService(ILogger<DownloadService> logger)
     {
         _logger = logger;
         _ytDlpPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tools", "yt-dlp");
+        _cookiesPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cookies.txt");
     }
 
     public async Task<string?> DownloadAudioAsync(string videoUrl, string title)
@@ -34,10 +36,22 @@ public class DownloadService
                 return filename;
             }
             
+            // Build arguments with optional cookies
+            var arguments = $"-f bestaudio --extract-audio --audio-format mp3 -o \"{filename}\" --no-playlist";
+            
+            // Add cookies file if it exists and has content
+            if (File.Exists(_cookiesPath) && new FileInfo(_cookiesPath).Length > 0)
+            {
+                arguments += $" --cookies \"{_cookiesPath}\"";
+                _logger.LogDebug("Using cookies file for yt-dlp");
+            }
+            
+            arguments += $" \"{videoUrl}\"";
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = _ytDlpPath,
-                Arguments = $"-f bestaudio --extract-audio --audio-format mp3 -o \"{filename}\" --no-playlist \"{videoUrl}\"",
+                Arguments = arguments,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
